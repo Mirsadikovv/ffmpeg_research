@@ -72,7 +72,64 @@ var (
 	}
 )
 
-// GetPreset возвращает пресет по имени
+// Дополнительные пресеты
+var (
+	// 4K пресеты
+	Preset4K = Preset{
+		Name:        "4k",
+		Description: "4K качество (3840x2160, H.264)",
+		Config: Config{
+			VideoCodec:   "libx264",
+			AudioCodec:   "aac",
+			Resolution:   "3840x2160",
+			VideoBitrate: "15000k",
+			AudioBitrate: "192k",
+			Quality:      "20",
+		},
+	}
+
+	// Streaming пресеты
+	PresetTwitch = Preset{
+		Name:        "twitch",
+		Description: "Оптимизировано для Twitch стрима",
+		Config: Config{
+			VideoCodec:   "libx264",
+			AudioCodec:   "aac",
+			Resolution:   "1920x1080",
+			VideoBitrate: "6000k",
+			AudioBitrate: "160k",
+			FrameRate:    "60",
+			Quality:      "23",
+		},
+	}
+
+	PresetYouTube = Preset{
+		Name:        "youtube",
+		Description: "Оптимизировано для YouTube",
+		Config: Config{
+			VideoCodec:   "libx264",
+			AudioCodec:   "aac",
+			Resolution:   "1920x1080",
+			VideoBitrate: "8000k",
+			AudioBitrate: "192k",
+			FrameRate:    "30",
+			Quality:      "21",
+		},
+	}
+
+	// Архивные пресеты
+	PresetArchive = Preset{
+		Name:        "archive",
+		Description: "Высокое качество для архивирования",
+		Config: Config{
+			VideoCodec: "libx265",
+			AudioCodec: "flac",
+			Quality:    "18",
+		},
+	}
+)
+
+// GetPreset обновленная версия с новыми пресетами
 func GetPreset(name string) (*Preset, bool) {
 	presets := map[string]Preset{
 		"web-hd":    PresetWebHD,
@@ -80,13 +137,17 @@ func GetPreset(name string) (*Preset, bool) {
 		"mobile":    PresetMobile,
 		"audio-mp3": PresetAudioMP3,
 		"audio-aac": PresetAudioAAC,
+		"4k":        Preset4K,
+		"twitch":    PresetTwitch,
+		"youtube":   PresetYouTube,
+		"archive":   PresetArchive,
 	}
 
 	preset, exists := presets[name]
 	return &preset, exists
 }
 
-// ListPresets возвращает список всех доступных пресетов
+// ListPresets обновленная версия
 func ListPresets() []Preset {
 	return []Preset{
 		PresetWebHD,
@@ -94,5 +155,9 @@ func ListPresets() []Preset {
 		PresetMobile,
 		PresetAudioMP3,
 		PresetAudioAAC,
+		Preset4K,
+		PresetTwitch,
+		PresetYouTube,
+		PresetArchive,
 	}
 }

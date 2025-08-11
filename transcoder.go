@@ -6,6 +6,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -182,4 +183,79 @@ func (t *Transcoder) GetInfo(filePath string) (map[string]interface{}, error) {
 	}
 
 	return result, nil
+}
+
+// ConvertToFormat конвертирует файл в указанный формат с базовыми настройками
+func (t *Transcoder) ConvertToFormat(inputPath, outputPath, format string) error {
+	config := Config{
+		InputPath:  inputPath,
+		OutputPath: outputPath,
+		Format:     format,
+	}
+
+	// Автоматически выбираем подходящие кодеки для формата
+	switch format {
+	case "mp4":
+		config.VideoCodec = "libx264"
+		config.AudioCodec = "aac"
+	case "webm":
+		config.VideoCodec = "libvpx-vp9"
+		config.AudioCodec = "libopus"
+	case "avi":
+		config.VideoCodec = "libx264"
+		config.AudioCodec = "mp3"
+	case "mp3":
+		config.AudioCodec = "libmp3lame"
+		config.AudioBitrate = "192k"
+	case "m4a":
+		config.AudioCodec = "aac"
+		config.AudioBitrate = "128k"
+	}
+
+	job := t.CreateJob(config)
+	return t.Execute(context.Background(), job)
+}
+
+// ExtractAudio извлекает аудиодорожку из видеофайла
+func (t *Transcoder) ExtractAudio(inputPath, outputPath string) error {
+	config := Config{
+		InputPath:  inputPath,
+		OutputPath: outputPath,
+		AudioCodec: "copy", // копируем без перекодирования
+		VideoCodec: "",     // без видео
+	}
+
+	job := t.CreateJob(config)
+	return t.Execute(context.Background(), job)
+}
+
+// CreateThumbnail создает миниатюру из видео
+func (t *Transcoder) CreateThumbnail(inputPath, outputPath string, timeOffset string) error {
+	args := []string{
+		"-i", inputPath,
+		"-ss", timeOffset,
+		"-frames:v", "1",
+		"-y",
+		outputPath,
+	}
+
+	cmd := exec.Command(t.ffmpegPath, args...)
+	return cmd.Run()
+}
+
+// GetDuration получает продолжительность медиафайла
+func (t *Transcoder) GetDuration(filePath string) (string, error) {
+	cmd := exec.Command("ffprobe",
+		"-v", "quiet",
+		"-show_entries", "format=duration",
+		"-of", "csv=p=0",
+		filePath,
+	)
+
+	output, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("ошибка получения продолжительности: %w", err)
+	}
+
+	return strings.TrimSpace(string(output)), nil
 }

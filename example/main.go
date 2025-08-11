@@ -88,4 +88,37 @@ func main() {
 	for _, p := range presets {
 		fmt.Printf("- %s: %s\n", p.Name, p.Description)
 	}
+
+	// Пример 6: Быстрая конвертация в формат
+	fmt.Println("\n=== Быстрая конвертация ===")
+	if err := tc.ConvertToFormat("input.mp4", "output.webm", "webm"); err != nil {
+		fmt.Printf("Ошибка конвертации: %v\n", err)
+	} else {
+		fmt.Println("Конвертация в WebM завершена")
+	}
+
+	// Пример 7: Извлечение аудио
+	fmt.Println("\n=== Извлечение аудио ===")
+	if err := tc.ExtractAudio("input.mp4", "audio.mp3"); err != nil {
+		fmt.Printf("Ошибка извлечения аудио: %v\n", err)
+	} else {
+		fmt.Println("Аудио извлечено")
+	}
+
+	// Пример 8: Создание миниатюры
+	fmt.Println("\n=== Создание миниатюры ===")
+	if err := tc.CreateThumbnail("input.mp4", "thumbnail.jpg", "00:00:10"); err != nil {
+		fmt.Printf("Ошибка создания миниатюры: %v\n", err)
+	} else {
+		fmt.Println("Миниатюра создана")
+	}
+
+	// Пример 9: Получение продолжительности
+	fmt.Println("\n=== Продолжительность файла ===")
+	duration, err := tc.GetDuration("input.mp4")
+	if err != nil {
+		fmt.Printf("Ошибка получения продолжительности: %v\n", err)
+	} else {
+		fmt.Printf("Продолжительность: %s секунд\n", duration)
+	}
 }
