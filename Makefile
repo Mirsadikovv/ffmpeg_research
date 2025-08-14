@@ -16,6 +16,10 @@ run: build
 example:
 	go run example/main.go
 
+# Запуск расширенного примера
+example-advanced:
+	go run example/advanced_example.go
+
 # Тесты
 test:
 	go test -v ./...
@@ -74,6 +78,7 @@ help:
 	@echo "  build         - Собрать проект"
 	@echo "  run           - Собрать и запустить пример"
 	@echo "  example       - Запустить пример напрямую"
+	@echo "  example-advanced - Запустить расширенный пример"
 	@echo "  test          - Запустить тесты"
 	@echo "  test-coverage - Запустить тесты с покрытием"
 	@echo "  bench         - Запустить бенчмарки"

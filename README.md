@@ -1,17 +1,29 @@
-# Transcoder Framework
+# 🎬 Transcoder Framework
 
-Простой и мощный фреймворк для транскодирования медиафайлов на Go с использованием FFmpeg.
+Профессиональный фреймворк для транскодирования медиафайлов на Go с использованием FFmpeg.
+
+**Версия 2.0** - Полностью переработанная архитектура с расширенными возможностями
 
 📖 **[Полный справочник FFmpeg](FFMPEG_REFERENCE.md)** - подробное руководство по всем возможностям FFmpeg
 
-## Возможности
+## ✨ Возможности
 
-- 🎥 Транскодирование видео и аудио файлов
-- 🔧 Гибкая настройка параметров кодирования
-- 📋 Предустановленные пресеты для популярных форматов
-- 🔄 Система очередей с поддержкой многопоточности
-- 📊 Получение информации о медиафайлах
-- 🚀 Простой и понятный API
+### 🎯 Основные функции
+- 🎥 **Транскодирование** видео и аудио файлов с валидацией
+- 📺 **HLS стримы** - загрузка и обработка .m3u8 плейлистов
+- 🔴 **Live стримы** - запись с ограничением по времени
+- 🔧 **Гибкая настройка** параметров кодирования
+- 📋 **19 пресетов** для популярных форматов и сценариев
+- 🔄 **Система очередей** с многопоточностью
+
+### 🚀 Новые возможности v2.0
+- 📊 **Расширенный анализ** медиафайлов с структурированными данными
+- 🎛️ **Система фильтров** FFmpeg (масштабирование, яркость, звук)
+- 🔗 **Конвейеры обработки** для сложных операций
+- 📈 **Отслеживание прогресса** в реальном времени
+- 📝 **Профессиональное логирование** с уровнями
+- ✅ **Автоматическая валидация** всех параметров
+- 🏗️ **Модульная архитектура** DTO/Utils/Presets
 
 ## Установка
 
@@ -32,26 +44,29 @@ brew install ffmpeg
 # Скачайте с https://ffmpeg.org/download.html
 ```
 
-## Быстрый старт
+## 🚀 Быстрый старт
 
+### Базовое использование
 ```go
 package main
 
 import (
     "context"
     "log"
-    "transcoder"
+    
+    transcoder "github.com/Mirsadikovv/ffmpeg_research"
+    "github.com/Mirsadikovv/ffmpeg_research/dto"
 )
 
 func main() {
-    // Создаем транскодер
+    // Создаем транскодер с автоматическим логированием
     tc, err := transcoder.New("ffmpeg")
     if err != nil {
         log.Fatal(err)
     }
 
-    // Настраиваем параметры
-    config := transcoder.Config{
+    // Настраиваем параметры с автоматической валидацией
+    config := dto.Config{
         InputPath:    "input.mp4",
         OutputPath:   "output.mp4",
         VideoCodec:   "libx264",
@@ -72,11 +87,86 @@ func main() {
 }
 ```
 
-## Использование пресетов
-
+### Расширенный пример с прогрессом
 ```go
-// Получаем пресет
-preset, exists := transcoder.GetPreset("web-hd")
+// Отслеживание прогресса в реальном времени
+progressCallback := func(progress float64, speed string, eta time.Duration) {
+    fmt.Printf("\rПрогресс: %.1f%% | Скорость: %s | ETA: %v", 
+        progress, speed, eta)
+}
+
+tracker := transcoder.NewProgressTracker(progressCallback)
+// Используйте tracker для мониторинга выполнения
+```
+
+## 🎛️ Новые возможности v2.0
+
+### Система фильтров FFmpeg
+```go
+// Создаем цепочку фильтров
+filterChain := transcoder.NewFilterChain().
+    AddVideoFilter("scale", map[string]string{"w": "1920", "h": "1080"}).
+    AddVideoFilter("eq", map[string]string{"brightness": "0.1", "contrast": "1.2"}).
+    AddAudioFilter("volume", map[string]string{"volume": "1.2"})
+
+// Применяем фильтры
+config := dto.Config{
+    InputPath:  "input.mp4",
+    OutputPath: "output_filtered.mp4",
+    VideoCodec: "libx264",
+    AudioCodec: "aac",
+}
+
+job := tc.CreateJob(config)
+err := tc.ExecuteWithFilters(ctx, job, filterChain)
+```
+
+### Конвейеры обработки (Pipelines)
+```go
+// Создаем веб-оптимизационный конвейер
+pipeline := transcoder.CreateWebOptimizationPipeline(tc)
+
+// Выполняем полный конвейер обработки
+err := pipeline.Execute(ctx, "input.mp4", "output_web.mp4")
+
+// Доступные конвейеры:
+// - CreateWebOptimizationPipeline() - веб-оптимизация
+// - CreateMobilePipeline() - мобильная оптимизация  
+// - CreateArchivePipeline() - архивирование
+```
+
+### Расширенный анализ медиафайлов
+```go
+// Получаем подробную информацию
+mediaInfo, err := tc.GetMediaInfo("video.mp4")
+if err == nil {
+    fmt.Printf("Разрешение: %s\n", mediaInfo.GetResolution())
+    fmt.Printf("Частота кадров: %.1f fps\n", mediaInfo.GetFrameRate())
+    fmt.Printf("Продолжительность: %.1f сек\n", mediaInfo.Duration.Seconds())
+    fmt.Printf("Краткая сводка: %s\n", mediaInfo.Summary())
+    
+    // Анализ потоков
+    videoStreams := mediaInfo.GetVideoStreams()
+    audioStreams := mediaInfo.GetAudioStreams()
+}
+```
+
+### Профессиональное логирование
+```go
+// Настройка уровня логирования
+logger := transcoder.NewDefaultLogger(transcoder.LogLevelDebug)
+tc.SetLogger(logger)
+
+// Или отключение логов в production
+tc.SetLogger(&transcoder.NoOpLogger{})
+```
+
+## 📋 Использование пресетов (19 штук!)
+
+### Получение пресета
+```go
+// Получаем пресет из новой системы
+preset, exists := presets.GetPreset("web-hd")
 if !exists {
     log.Fatal("Пресет не найден")
 }
@@ -89,6 +179,19 @@ config.OutputPath = "output_hd.mp4"
 // Выполняем транскодирование
 job := tc.CreateJob(config)
 tc.Execute(ctx, job)
+```
+
+### Пресеты по категориям
+```go
+// Получаем пресеты по категориям
+categories := presets.GetPresetsByCategory()
+
+for category, categoryPresets := range categories {
+    fmt.Printf("%s:\n", category)
+    for _, preset := range categoryPresets {
+        fmt.Printf("  - %s: %s\n", preset.Name, preset.Description)
+    }
+}
 ```
 
 ## Работа с очередью
@@ -158,6 +261,59 @@ tc.CreateThumbnail("video.mp4", "thumb.jpg", "00:00:10")
 ```go
 // Узнать продолжительность файла
 duration, err := tc.GetDuration("video.mp4")
+```
+
+## Работа с HLS стримами
+
+### Загрузка HLS плейлиста
+```go
+// Простая загрузка HLS стрима
+ctx := context.Background()
+err := tc.DownloadHLS(ctx, "https://example.com/playlist.m3u8", "stream.mp4")
+```
+
+### Расширенная конфигурация HLS
+```go
+config := transcoder.HLSConfig{
+    URL:        "https://example.com/playlist.m3u8",
+    OutputPath: "stream_hd.mp4",
+    Quality:    "1920x1080", // или "best", "worst"
+    Duration:   30 * time.Minute, // ограничение по времени
+    Headers: map[string]string{
+        "Referer":    "https://example.com",
+        "User-Agent": "Custom User Agent",
+    },
+    RetryAttempts:  3,
+    SegmentTimeout: 10 * time.Second,
+}
+
+err := tc.DownloadHLSWithConfig(ctx, config)
+```
+
+### Получение информации о плейлисте
+```go
+info, err := tc.GetHLSInfo("https://example.com/playlist.m3u8")
+if err == nil {
+    fmt.Printf("Найдено %d потоков\n", len(info.Streams))
+    fmt.Printf("Live стрим: %v\n", info.IsLive)
+    
+    for _, stream := range info.Streams {
+        fmt.Printf("Поток: %s, %d kbps\n", stream.Resolution, stream.Bandwidth/1000)
+    }
+}
+```
+
+### Запись live стрима
+```go
+// Записать live стрим в течение 10 минут
+duration := 10 * time.Minute
+err := tc.RecordLiveStream(ctx, "https://example.com/live.m3u8", "live_record.mp4", duration)
+```
+
+### Конвертация HLS в другой формат
+```go
+// Загрузить HLS и сконвертировать в WebM
+err := tc.ConvertHLSToFormat(ctx, "https://example.com/playlist.m3u8", "stream.webm", "webm")
 ```
 
 ## API Reference

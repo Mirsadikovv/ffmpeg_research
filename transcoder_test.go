@@ -3,6 +3,10 @@ package transcoder
 import (
 	"os"
 	"testing"
+
+	"github.com/Mirsadikovv/ffmpeg_research/dto"
+	"github.com/Mirsadikovv/ffmpeg_research/presets"
+	"github.com/Mirsadikovv/ffmpeg_research/utils"
 )
 
 func TestNew(t *testing.T) {
@@ -19,6 +23,10 @@ func TestNew(t *testing.T) {
 	if tc.ffmpegPath != "ffmpeg" {
 		t.Errorf("Ожидался путь 'ffmpeg', получен '%s'", tc.ffmpegPath)
 	}
+
+	if tc.logger == nil {
+		t.Error("Логгер не должен быть nil")
+	}
 }
 
 func TestCreateJob(t *testing.T) {
@@ -27,7 +35,7 @@ func TestCreateJob(t *testing.T) {
 		t.Skip("FFmpeg не найден, пропускаем тест")
 	}
 
-	config := Config{
+	config := dto.Config{
 		InputPath:  "test_input.mp4",
 		OutputPath: "test_output.mp4",
 		VideoCodec: "libx264",
@@ -44,8 +52,8 @@ func TestCreateJob(t *testing.T) {
 		t.Error("Job ID не должен быть пустым")
 	}
 
-	if job.Status != StatusPending {
-		t.Errorf("Ожидался статус %d, получен %d", StatusPending, job.Status)
+	if job.Status != dto.StatusPending {
+		t.Errorf("Ожидался статус %d, получен %d", dto.StatusPending, job.Status)
 	}
 
 	if job.Config.InputPath != config.InputPath {
@@ -55,7 +63,7 @@ func TestCreateJob(t *testing.T) {
 
 func TestGetPreset(t *testing.T) {
 	// Тест существующего пресета
-	preset, exists := GetPreset("web-hd")
+	preset, exists := presets.GetPreset("web-hd")
 	if !exists {
 		t.Error("Пресет 'web-hd' должен существовать")
 	}
@@ -65,16 +73,16 @@ func TestGetPreset(t *testing.T) {
 	}
 
 	// Тест несуществующего пресета
-	_, exists = GetPreset("nonexistent")
+	_, exists = presets.GetPreset("nonexistent")
 	if exists {
 		t.Error("Несуществующий пресет не должен быть найден")
 	}
 }
 
 func TestListPresets(t *testing.T) {
-	presets := ListPresets()
+	presetList := presets.ListPresets()
 
-	if len(presets) == 0 {
+	if len(presetList) == 0 {
 		t.Error("Список пресетов не должен быть пустым")
 	}
 
@@ -82,7 +90,7 @@ func TestListPresets(t *testing.T) {
 	expectedPresets := []string{"web-hd", "web-sd", "mobile", "audio-mp3", "audio-aac"}
 	presetNames := make(map[string]bool)
 
-	for _, preset := range presets {
+	for _, preset := range presetList {
 		presetNames[preset.Name] = true
 	}
 
@@ -94,9 +102,7 @@ func TestListPresets(t *testing.T) {
 }
 
 func TestBuildFFmpegArgs(t *testing.T) {
-	tc := &Transcoder{ffmpegPath: "ffmpeg"}
-
-	config := Config{
+	config := dto.Config{
 		InputPath:    "input.mp4",
 		OutputPath:   "output.mp4",
 		VideoCodec:   "libx264",
@@ -109,7 +115,7 @@ func TestBuildFFmpegArgs(t *testing.T) {
 		Format:       "mp4",
 	}
 
-	args := tc.buildFFmpegArgs(config)
+	args := utils.BuildFFmpegArgs(config)
 
 	// Проверяем основные аргументы
 	expectedArgs := []string{
@@ -154,7 +160,7 @@ func TestQueue(t *testing.T) {
 	}
 
 	// Тест добавления задач
-	config := Config{
+	config := dto.Config{
 		InputPath:  "test.mp4",
 		OutputPath: "output.mp4",
 	}
@@ -178,7 +184,7 @@ func BenchmarkCreateJob(b *testing.B) {
 		b.Skip("FFmpeg не найден, пропускаем бенчмарк")
 	}
 
-	config := Config{
+	config := dto.Config{
 		InputPath:  "input.mp4",
 		OutputPath: "output.mp4",
 		VideoCodec: "libx264",
@@ -192,8 +198,7 @@ func BenchmarkCreateJob(b *testing.B) {
 }
 
 func BenchmarkBuildFFmpegArgs(b *testing.B) {
-	tc := &Transcoder{ffmpegPath: "ffmpeg"}
-	config := Config{
+	config := dto.Config{
 		InputPath:    "input.mp4",
 		OutputPath:   "output.mp4",
 		VideoCodec:   "libx264",
@@ -204,7 +209,7 @@ func BenchmarkBuildFFmpegArgs(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		tc.buildFFmpegArgs(config)
+		utils.BuildFFmpegArgs(config)
 	}
 }
 

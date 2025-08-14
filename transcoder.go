@@ -9,6 +9,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Mirsadikovv/ffmpeg_research/dto"
+	"github.com/Mirsadikovv/ffmpeg_research/utils"
 	"github.com/google/uuid"
 )
 
@@ -16,42 +18,9 @@ import (
 type Transcoder struct {
 	ffmpegPath string
 	tempDir    string
+	hls        *HLSDownloader
+	logger     Logger
 }
-
-// Config содержит настройки для транскодирования
-type Config struct {
-	InputPath    string
-	OutputPath   string
-	VideoCodec   string
-	AudioCodec   string
-	VideoBitrate string
-	AudioBitrate string
-	Resolution   string
-	FrameRate    string
-	Quality      string
-	Format       string
-}
-
-// Job представляет задачу транскодирования
-type Job struct {
-	ID        string
-	Config    Config
-	Status    JobStatus
-	Progress  float64
-	Error     error
-	StartTime time.Time
-	EndTime   time.Time
-}
-
-// JobStatus представляет статус задачи
-type JobStatus int
-
-const (
-	StatusPending JobStatus = iota
-	StatusRunning
-	StatusCompleted
-	StatusFailed
-)
 
 // New создает новый экземпляр транскодера
 func New(ffmpegPath string) (*Transcoder, error) {
@@ -60,7 +29,7 @@ func New(ffmpegPath string) (*Transcoder, error) {
 	}
 
 	// Проверяем доступность FFmpeg
-	if err := checkFFmpeg(ffmpegPath); err != nil {
+	if err := utils.CheckFFmpeg(ffmpegPath); err != nil {
 		return nil, fmt.Errorf("FFmpeg не найден: %w", err)
 	}
 
@@ -69,97 +38,63 @@ func New(ffmpegPath string) (*Transcoder, error) {
 		return nil, fmt.Errorf("не удалось создать временную директорию: %w", err)
 	}
 
-	return &Transcoder{
+	transcoder := &Transcoder{
 		ffmpegPath: ffmpegPath,
 		tempDir:    tempDir,
-	}, nil
-}
+		logger:     NewDefaultLogger(LogLevelInfo), // По умолчанию INFO уровень
+	}
 
-// checkFFmpeg проверяет доступность FFmpeg
-func checkFFmpeg(path string) error {
-	cmd := exec.Command(path, "-version")
-	return cmd.Run()
+	// Инициализируем HLS загрузчик
+	transcoder.hls = NewHLSDownloader(transcoder)
+
+	return transcoder, nil
 }
 
 // CreateJob создает новую задачу транскодирования
-func (t *Transcoder) CreateJob(config Config) *Job {
-	return &Job{
+func (t *Transcoder) CreateJob(config dto.Config) *dto.Job {
+	return &dto.Job{
 		ID:     uuid.New().String(),
 		Config: config,
-		Status: StatusPending,
+		Status: dto.StatusPending,
 	}
 }
 
 // Execute выполняет транскодирование
-func (t *Transcoder) Execute(ctx context.Context, job *Job) error {
-	job.Status = StatusRunning
+func (t *Transcoder) Execute(ctx context.Context, job *dto.Job) error {
+	// Валидируем конфигурацию перед выполнением
+	if err := job.Config.Validate(); err != nil {
+		job.Status = dto.StatusFailed
+		job.Error = err
+		t.logger.Error("Ошибка валидации конфигурации: %v", err)
+		return fmt.Errorf("ошибка валидации конфигурации: %w", err)
+	}
+
+	job.Status = dto.StatusRunning
 	job.StartTime = time.Now()
 
-	args := t.buildFFmpegArgs(job.Config)
+	t.logger.Info("Начало транскодирования: %s -> %s", job.Config.InputPath, job.Config.OutputPath)
+
+	args := utils.BuildFFmpegArgs(job.Config)
+	t.logger.Debug("FFmpeg аргументы: %v", args)
+
 	cmd := exec.CommandContext(ctx, t.ffmpegPath, args...)
 
 	if err := cmd.Run(); err != nil {
-		job.Status = StatusFailed
+		job.Status = dto.StatusFailed
 		job.Error = err
 		job.EndTime = time.Now()
+		t.logger.Error("Ошибка выполнения FFmpeg: %v", err)
 		return fmt.Errorf("ошибка транскодирования: %w", err)
 	}
 
-	job.Status = StatusCompleted
+	job.Status = dto.StatusCompleted
 	job.Progress = 100.0
 	job.EndTime = time.Now()
+
+	duration := job.EndTime.Sub(job.StartTime)
+	t.logger.Info("Транскодирование завершено за %v", duration)
+
 	return nil
-}
-
-// buildFFmpegArgs строит аргументы для FFmpeg
-func (t *Transcoder) buildFFmpegArgs(config Config) []string {
-	args := []string{
-		"-i", config.InputPath,
-		"-y", // перезаписывать выходной файл
-	}
-
-	// Видео кодек
-	if config.VideoCodec != "" {
-		args = append(args, "-c:v", config.VideoCodec)
-	}
-
-	// Аудио кодек
-	if config.AudioCodec != "" {
-		args = append(args, "-c:a", config.AudioCodec)
-	}
-
-	// Битрейт видео
-	if config.VideoBitrate != "" {
-		args = append(args, "-b:v", config.VideoBitrate)
-	}
-
-	// Битрейт аудио
-	if config.AudioBitrate != "" {
-		args = append(args, "-b:a", config.AudioBitrate)
-	}
-
-	// Разрешение
-	if config.Resolution != "" {
-		args = append(args, "-s", config.Resolution)
-	}
-
-	// Частота кадров
-	if config.FrameRate != "" {
-		args = append(args, "-r", config.FrameRate)
-	}
-
-	// Качество
-	if config.Quality != "" {
-		args = append(args, "-crf", config.Quality)
-	}
-
-	// Формат
-	if config.Format != "" {
-		args = append(args, "-f", config.Format)
-	}
-
-	args = append(args, config.OutputPath)
-	return args
 }
 
 // GetInfo получает информацию о медиафайле
@@ -187,29 +122,18 @@ func (t *Transcoder) GetInfo(filePath string) (map[string]interface{}, error) {
 
 // ConvertToFormat конвертирует файл в указанный формат с базовыми настройками
 func (t *Transcoder) ConvertToFormat(inputPath, outputPath, format string) error {
-	config := Config{
+	config := dto.Config{
 		InputPath:  inputPath,
 		OutputPath: outputPath,
 		Format:     format,
 	}
 
 	// Автоматически выбираем подходящие кодеки для формата
-	switch format {
-	case "mp4":
-		config.VideoCodec = "libx264"
-		config.AudioCodec = "aac"
-	case "webm":
-		config.VideoCodec = "libvpx-vp9"
-		config.AudioCodec = "libopus"
-	case "avi":
-		config.VideoCodec = "libx264"
-		config.AudioCodec = "mp3"
-	case "mp3":
-		config.AudioCodec = "libmp3lame"
-		config.AudioBitrate = "192k"
-	case "m4a":
-		config.AudioCodec = "aac"
-		config.AudioBitrate = "128k"
+	videoCodec, audioCodec, audioBitrate := utils.GetCodecsForFormat(format)
+	config.VideoCodec = videoCodec
+	config.AudioCodec = audioCodec
+	if audioBitrate != "" {
+		config.AudioBitrate = audioBitrate
 	}
 
 	job := t.CreateJob(config)
@@ -218,7 +142,7 @@ func (t *Transcoder) ConvertToFormat(inputPath, outputPath, format string) error
 
 // ExtractAudio извлекает аудиодорожку из видеофайла
 func (t *Transcoder) ExtractAudio(inputPath, outputPath string) error {
-	config := Config{
+	config := dto.Config{
 		InputPath:  inputPath,
 		OutputPath: outputPath,
 		AudioCodec: "copy", // копируем без перекодирования
@@ -258,4 +182,46 @@ func (t *Transcoder) GetDuration(filePath string) (string, error) {
 	}
 
 	return strings.TrimSpace(string(output)), nil
+}
+
+// HLS методы
+
+// DownloadHLS загружает HLS стрим или плейлист
+func (t *Transcoder) DownloadHLS(ctx context.Context, hlsURL, outputPath string) error {
+	config := dto.HLSConfig{
+		URL:        hlsURL,
+		OutputPath: outputPath,
+		Quality:    "best",
+	}
+	return t.hls.DownloadHLS(ctx, config)
+}
+
+// DownloadHLSWithConfig загружает HLS с расширенной конфигурацией
+func (t *Transcoder) DownloadHLSWithConfig(ctx context.Context, config dto.HLSConfig) error {
+	return t.hls.DownloadHLS(ctx, config)
+}
+
+// GetHLSInfo получает информацию о HLS плейлисте
+func (t *Transcoder) GetHLSInfo(playlistURL string) (*dto.PlaylistInfo, error) {
+	return t.hls.GetPlaylistInfo(playlistURL)
+}
+
+// RecordLiveStream записывает live стрим с ограничением по времени
+func (t *Transcoder) RecordLiveStream(ctx context.Context, streamURL, outputPath string, duration time.Duration) error {
+	return t.hls.RecordLiveStream(ctx, streamURL, outputPath, duration)
+}
+
+// ConvertHLSToFormat загружает HLS и конвертирует в указанный формат
+func (t *Transcoder) ConvertHLSToFormat(ctx context.Context, hlsURL, outputPath, format string) error {
+	return t.hls.ConvertHLSToFormat(ctx, hlsURL, outputPath, format)
+}
+
+// SetLogger устанавливает кастомный логгер
+func (t *Transcoder) SetLogger(logger Logger) {
+	t.logger = logger
+}
+
+// GetLogger возвращает текущий логгер
+func (t *Transcoder) GetLogger() Logger {
+	return t.logger
 }
