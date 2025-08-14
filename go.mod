@@ -1,4 +1,4 @@
-module transcoder
+module github.com/Mirsadikovv/ffmpeg_research
 
 go 1.21
 

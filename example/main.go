@@ -6,7 +6,7 @@ import (
 	"log"
 	"time"
 
-	"transcoder"
+	transcoder "github.com/Mirsadikovv/ffmpeg_research"
 )
 
 func main() {
